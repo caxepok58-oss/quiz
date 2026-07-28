@@ -38,8 +38,10 @@ async def cmd_sources(message: Message, db: Database) -> None:
         return
     lines = ["Статус источников:"]
     for source, ok, msg, count, updated_at in rows:
-        mark = "✅" if ok else "⚠️"
-        lines.append(f"{mark} {source}: {count} игр, обновлено {updated_at} UTC ({msg})")
+        if ok:
+            lines.append(f"✅ {source}: {count} игр, обновлено {updated_at} UTC")
+        else:
+            lines.append(f"⚠️ {source}: данные недоступны, нет расписания")
     await message.answer("\n".join(lines))
 
 
