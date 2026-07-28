@@ -14,10 +14,10 @@ give that source's subclass a dedicated parser.
 import logging
 from datetime import date
 
-import aiohttp
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
+from ..http_client import fetch_text
 from ..models import Event
 from ..text_parsing import count_dates, find_date, find_time
 from .base import BaseSource
@@ -34,10 +34,8 @@ class HeuristicScheduleSource(BaseSource):
         self.url = url
         self.default_venue = default_venue
 
-    async def fetch(self, session: aiohttp.ClientSession) -> list[Event]:
-        async with session.get(self.url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
-            resp.raise_for_status()
-            html = await resp.text()
+    async def fetch(self) -> list[Event]:
+        html = await fetch_text(self.url)
         return self.parse(html)
 
     def parse(self, html: str) -> list[Event]:
