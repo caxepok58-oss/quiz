@@ -19,6 +19,7 @@ class Config:
     lookahead_days: int
     scrape_hour: int
     db_path: str
+    proxy_url: str | None
 
 
 def load_config() -> Config:
@@ -33,4 +34,5 @@ def load_config() -> Config:
         lookahead_days=int(os.environ.get("LOOKAHEAD_DAYS", "30")),
         scrape_hour=int(os.environ.get("SCRAPE_HOUR", "6")),
         db_path=os.environ.get("DB_PATH", "quizzes.db"),
+        proxy_url=os.environ.get("BOT_PROXY_URL") or None,
     )

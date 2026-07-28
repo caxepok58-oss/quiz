@@ -39,7 +39,7 @@ async def main() -> None:
 
     bot = Bot(
         token=config.bot_token,
-        session=_IPv4AiohttpSession(),
+        session=_IPv4AiohttpSession(proxy=config.proxy_url),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher()
