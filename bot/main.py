@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import socket
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 
 from .aggregator import refresh_all
@@ -15,13 +17,31 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 
+class _IPv4AiohttpSession(AiohttpSession):
+    """Forces IPv4 for the Telegram API connection.
+
+    On some Windows setups, aiohttp's default connector tries IPv6 to
+    api.telegram.org and hangs with "ClientConnectorError ... semaphore
+    timeout" even though IPv4 connectivity (curl, Telegram Desktop) works
+    fine. Restricting the connector to AF_INET avoids that path entirely.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._connector_init["family"] = socket.AF_INET
+
+
 async def main() -> None:
     config = load_config()
 
     db = Database(config.db_path)
     await db.connect()
 
-    bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(
+        token=config.bot_token,
+        session=_IPv4AiohttpSession(),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     dp = Dispatcher()
     dp.include_router(common.router)
     dp.include_router(games.router)
