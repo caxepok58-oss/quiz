@@ -19,6 +19,21 @@ _MONTHS_GENITIVE = [
 
 _MAX_MESSAGE_LEN = 3500
 
+_FRANCHISE_NAMES = {
+    "quizplease": "Квиз, плиз!",
+    "club60sec": "60 секунд",
+    "shakerquiz": "Шейкер квиз",
+    "brainsurf": "BrainSurf",
+    "mamaquiz": "МАМАКВИЗ!",
+    "wowquiz": "Вау Квиз",
+    "mozgoboynya": "Мозгобойня",
+    "manual": "Вручную",
+}
+
+
+def _franchise_name(source: str) -> str:
+    return _FRANCHISE_NAMES.get(source, source)
+
 
 def _format_date_header(d: date) -> str:
     return f"{d.day} {_MONTHS_GENITIVE[d.month]} ({_WEEKDAYS[d.weekday()]})"
@@ -30,14 +45,15 @@ def _truncate(text: str | None, width: int) -> str:
 
 
 def _render_day_table(entries: list[tuple]) -> str:
-    lines = [f"{'Время':<6}{'Игра':<30}{'Место':<20}"]
-    lines.append("-" * 56)
-    for event_time, title, venue, price, _source in entries:
+    lines = [f"{'Время':<6}{'Франшиза':<14}{'Игра':<24}{'Место':<16}"]
+    lines.append("-" * 60)
+    for event_time, title, venue, price, source in entries:
         time_part = (event_time or "??:??").ljust(6)
-        title_part = _truncate(title, 28).ljust(30)
-        venue_part = _truncate(venue or "уточняется", 20)
+        franchise_part = _truncate(_franchise_name(source), 12).ljust(14)
+        title_part = _truncate(title, 22).ljust(24)
+        venue_part = _truncate(venue or "уточняется", 16)
         price_part = f"  {price}" if price else ""
-        lines.append(f"{time_part}{title_part}{venue_part}{price_part}")
+        lines.append(f"{time_part}{franchise_part}{title_part}{venue_part}{price_part}")
     return "<pre>" + "\n".join(lines) + "</pre>"
 
 
