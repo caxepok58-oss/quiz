@@ -1,4 +1,5 @@
 from datetime import date
+from html import escape
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
@@ -76,7 +77,7 @@ async def cmd_add_game(message: Message, db: Database, admin_ids: set[int]) -> N
     venue = fields[1] if len(fields) > 1 and fields[1] else None
     price = fields[2] if len(fields) > 2 and fields[2] else None
     await db.add_manual_event(title, venue, None, event_date.isoformat(), time_part, price, message.from_user.id)
-    await message.answer(f"Добавлено: {event_date.isoformat()} {time_part} — {title}")
+    await message.answer(f"Добавлено: {event_date.isoformat()} {time_part} — {escape(title)}")
 
 
 @router.message(Command("list_manual"))

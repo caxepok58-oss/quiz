@@ -1,5 +1,6 @@
 import logging
 from datetime import date, datetime, time, timedelta
+from html import escape
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot
@@ -19,11 +20,12 @@ def _event_datetime(event_date: str, event_time: str, tz: ZoneInfo) -> datetime:
 async def _send_reminder(
     bot: Bot, chat_id: int, source: str, title: str, venue: str | None, price: str | None, url: str | None
 ) -> None:
-    price_str = f" · {price} ₽" if price else ""
-    venue_str = venue or "уточняется"
-    text = f"⏰ Скоро игра!\n{franchise_color(source)} {franchise_name(source)}{price_str}\n{title}\n📍 {venue_str}"
+    price_str = f" · {escape(price)} ₽" if price else ""
+    venue_str = escape(venue) if venue else "уточняется"
+    title_str = escape(title) if title else "—"
+    text = f"⏰ Скоро игра!\n{franchise_color(source)} {franchise_name(source)}{price_str}\n{title_str}\n📍 {venue_str}"
     if url:
-        text += f'\n\n<a href="{url}">Расписание франшизы</a>'
+        text += f'\n\n<a href="{escape(url)}">Расписание франшизы</a>'
     await bot.send_message(chat_id, text)
 
 

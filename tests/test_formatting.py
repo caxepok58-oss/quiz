@@ -40,6 +40,19 @@ def test_build_messages_groups_by_date_and_includes_fields():
     assert "20:30" in text
 
 
+def test_build_messages_escapes_html_special_characters_in_venue_and_price():
+    # Telegram messages are sent with parse_mode=HTML; a venue/price scraped
+    # from a source site containing "<" or "&" must not be interpreted as
+    # markup (it would either break message parsing or inject an unintended tag).
+    rows = [("quizplease", "Игра", 'Бар "Огни" & <Компания>', None, "2026-08-05", "19:00", "500<b>", None)]
+    messages = build_messages(rows, "Пенза", 30)
+    text = messages[0]
+    assert "<Компания>" not in text
+    assert "&lt;Компания&gt;" in text
+    assert "500<b>" not in text
+    assert "500&lt;b&gt;" in text
+
+
 def test_build_messages_splits_when_too_long():
     rows = [
         ("quizplease", f"Игра номер {i}", "Место", None, f"2026-08-{(i % 28) + 1:02d}", "19:00", None, None)

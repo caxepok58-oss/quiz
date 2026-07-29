@@ -79,12 +79,13 @@ def _render_day_entries(entries: list[tuple]) -> str:
     # nothing to misalign and reads fine on any screen size.
     cards = []
     for event_time, title, venue, price, source, url in entries:
-        price_str = f" · {price} ₽" if price else ""
+        price_str = f" · {escape(price)} ₽" if price else ""
         header_line = f"{franchise_color(source)} {event_time or '??:??'} · {franchise_name(source)}{price_str}"
         title_display = escape(title) if title else "—"
         if url:
             title_display = f'<a href="{escape(url)}">{title_display}</a>'
-        cards.append(f"{header_line}\n{title_display}\n📍 {venue or 'уточняется'}")
+        venue_display = escape(venue) if venue else "уточняется"
+        cards.append(f"{header_line}\n{title_display}\n📍 {venue_display}")
     return "\n\n".join(cards)
 
 
