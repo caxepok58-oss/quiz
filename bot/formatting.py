@@ -69,16 +69,27 @@ def _wrap(text: str, width: int) -> list[str]:
     return textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False) or [""]
 
 
+def _display_width(text: str) -> int:
+    # Colored circle emoji (and other pictographs) render roughly two
+    # monospace cells wide in Telegram's <pre> font, but len() counts them
+    # as one character - padding with len() alone drifts the "|" dividers.
+    return sum(2 if ord(ch) >= 0x1F000 else 1 for ch in text)
+
+
+def _pad(text: str, width: int) -> str:
+    return text + " " * max(0, width - _display_width(text))
+
+
 _ROW_WIDTH = _COL_TIME + _COL_FRANCHISE + _COL_TITLE + _COL_VENUE + _COL_PRICE + 4  # + 4 "|" separators
 
 
 def _row(time_col: str, franchise_col: str, title_col: str, venue_col: str, price_col: str) -> str:
     return (
-        f"{time_col:<{_COL_TIME}}|"
-        f"{franchise_col:<{_COL_FRANCHISE}}|"
-        f"{title_col:<{_COL_TITLE}}|"
-        f"{venue_col:<{_COL_VENUE}}|"
-        f"{price_col:<{_COL_PRICE}}"
+        f"{_pad(time_col, _COL_TIME)}|"
+        f"{_pad(franchise_col, _COL_FRANCHISE)}|"
+        f"{_pad(title_col, _COL_TITLE)}|"
+        f"{_pad(venue_col, _COL_VENUE)}|"
+        f"{_pad(price_col, _COL_PRICE)}"
     )
 
 
