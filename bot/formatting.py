@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from html import escape
 
 _WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
@@ -46,11 +46,25 @@ _FRANCHISE_COLORS = {
 }
 
 
-def _franchise_name(source: str) -> str:
+# The 7 scraped franchises, in display order - used to build the favorites
+# toggle keyboard. "manual" is intentionally excluded: it's not a franchise
+# a user can follow, it's whatever the admin adds by hand.
+FRANCHISE_KEYS = [
+    "quizplease",
+    "club60sec",
+    "shakerquiz",
+    "brainsurf",
+    "mamaquiz",
+    "wowquiz",
+    "mozgoboynya",
+]
+
+
+def franchise_name(source: str) -> str:
     return _FRANCHISE_NAMES.get(source, source)
 
 
-def _franchise_color(source: str) -> str:
+def franchise_color(source: str) -> str:
     return _FRANCHISE_COLORS.get(source, "⚫")
 
 
@@ -66,7 +80,7 @@ def _render_day_entries(entries: list[tuple]) -> str:
     cards = []
     for event_time, title, venue, price, source, url in entries:
         price_str = f" · {price} ₽" if price else ""
-        header_line = f"{_franchise_color(source)} {event_time or '??:??'} · {_franchise_name(source)}{price_str}"
+        header_line = f"{franchise_color(source)} {event_time or '??:??'} · {franchise_name(source)}{price_str}"
         title_display = escape(title) if title else "—"
         if url:
             title_display = f'<a href="{escape(url)}">{title_display}</a>'
@@ -74,10 +88,27 @@ def _render_day_entries(entries: list[tuple]) -> str:
     return "\n\n".join(cards)
 
 
-def build_messages(rows, city_name: str, days_ahead: int) -> list[str]:
+def _format_freshness(updated_at: str) -> str:
+    try:
+        updated_dt = datetime.fromisoformat(updated_at)
+    except ValueError:
+        return ""
+    minutes = max(0, int((datetime.utcnow() - updated_dt).total_seconds() // 60))
+    if minutes < 1:
+        when = "только что"
+    elif minutes < 60:
+        when = f"{minutes} мин. назад"
+    else:
+        when = f"{minutes // 60} ч. назад"
+    return f"🕐 Данные обновлены: {when}"
+
+
+def build_messages(rows, city_name: str, days_ahead: int, updated_at: str | None = None) -> list[str]:
     """rows: iterable of (source, title, venue, address, event_date, event_time, price, url)."""
     if not rows:
-        return [f"На ближайшие {days_ahead} дней в г. {city_name} игр не найдено."]
+        text = f"На ближайшие {days_ahead} дней в г. {city_name} игр не найдено."
+        freshness = _format_freshness(updated_at) if updated_at else ""
+        return [f"{text}\n\n{freshness}" if freshness else text]
 
     by_date: dict[str, list[tuple]] = {}
     for source, title, venue, _address, event_date, event_time, price, url in rows:
@@ -102,4 +133,8 @@ def build_messages(rows, city_name: str, days_ahead: int) -> list[str]:
             current = candidate
     if current.strip():
         messages.append(current.rstrip())
+    if updated_at and messages:
+        freshness = _format_freshness(updated_at)
+        if freshness:
+            messages[-1] = f"{messages[-1]}\n\n{freshness}"
     return messages

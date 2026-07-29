@@ -10,7 +10,7 @@ from aiogram.enums import ParseMode
 from .aggregator import refresh_all
 from .config import load_config
 from .db import Database
-from .handlers import admin, common, games
+from .handlers import admin, common, favorites, games, reminders
 from .scheduler import setup_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,6 +45,8 @@ async def main() -> None:
     dp = Dispatcher()
     dp.include_router(common.router)
     dp.include_router(games.router)
+    dp.include_router(favorites.router)
+    dp.include_router(reminders.router)
     dp.include_router(admin.router)
 
     dp["db"] = db
@@ -54,7 +56,7 @@ async def main() -> None:
 
     logger.info("Running initial schedule refresh")
     await refresh_all(db)
-    scheduler = setup_scheduler(db, config.scrape_hour, config.timezone)
+    scheduler = setup_scheduler(db, bot, config.scrape_hour, config.timezone)
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)

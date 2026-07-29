@@ -14,6 +14,8 @@ async def cmd_start(message: Message, city_name: str) -> None:
         f"и обновляю его раз в сутки.\n\n"
         f"Кнопки ниже — быстрый доступ к расписанию, либо команды:\n"
         f"/games — список ближайших игр\n"
+        f"/favorites — выбрать интересные франшизы (фильтрует /games)\n"
+        f"/remind_on — включить напоминания перед игрой, /remind_off — выключить\n"
         f"/sources — статус источников данных",
         reply_markup=main_menu_keyboard(),
     )

@@ -13,8 +13,10 @@ router = Router(name="games")
 
 async def _send_games(message: Message, db: Database, city_name: str, days: int) -> None:
     today = date.today()
-    rows = await db.get_upcoming(today, today + timedelta(days=days))
-    for chunk in build_messages(rows, city_name, days):
+    favorites = await db.get_favorites(message.chat.id)
+    rows = await db.get_upcoming(today, today + timedelta(days=days), favorites or None)
+    updated_at = await db.get_last_successful_update()
+    for chunk in build_messages(rows, city_name, days, updated_at):
         await message.answer(chunk)
 
 
