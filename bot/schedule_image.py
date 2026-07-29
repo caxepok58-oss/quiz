@@ -1,4 +1,5 @@
 import io
+import math
 from datetime import date
 from pathlib import Path
 
@@ -23,12 +24,13 @@ _CELL_PADDING = 8
 _MARGIN = 20
 _DATE_GAP = 12  # blank space between two different dates' row groups
 
-# Every row is a single line - column widths are computed per-image from the
-# actual text so nothing wraps or gets clipped, at the cost of a wider table.
-# These caps only guard against one pathologically long title/venue blowing
-# the image out; ordinary data never gets near them.
+# Rows are single-line by default - column widths are computed per-image
+# from the actual text so nothing wraps, at the cost of a wider table. These
+# caps bound how far a column stretches for one long title/venue; a cell that
+# still doesn't fit at the cap wraps onto extra lines as the exception.
 _COL_TITLE_MAX_W = 700
 _COL_VENUE_MAX_W = 500
+_MAX_WRAP_LINES = 3
 
 # Pastel per-franchise row backgrounds - saturated enough to tell rows apart,
 # light enough that dark text stays readable without needing per-row text color.
@@ -70,27 +72,50 @@ def _format_short_date(d: date) -> str:
     return f"{d:%d.%m.%Y} {_WEEKDAYS[d.weekday()]}"
 
 
-def _fit_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> str:
-    """Truncate to a single line with an ellipsis if it doesn't fit max_width."""
+def _wrap_cell(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
+    """Single line whenever it fits; only a cell that doesn't fit even at the
+    column's (capped) width wraps onto extra lines, as an exception rather
+    than the default - most rows stay one line."""
     text = (text or "").strip()
-    if not text or draw.textlength(text, font=font) <= max_width:
-        return text
-    while text and draw.textlength(f"{text}…", font=font) > max_width:
-        text = text[:-1]
-    return f"{text}…"
+    if not text:
+        return [""]
+    if draw.textlength(text, font=font) <= max_width:
+        return [text]
+
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if current and draw.textlength(candidate, font=font) > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    lines.append(current)
+
+    if len(lines) <= _MAX_WRAP_LINES:
+        return lines
+
+    kept = lines[:_MAX_WRAP_LINES]
+    last = kept[-1]
+    while last and draw.textlength(f"{last}…", font=font) > max_width:
+        last = last[:-1]
+    kept[-1] = f"{last}…"
+    return kept
 
 
 def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str | None = None) -> bytes:
     """rows: same shape as Database.get_upcoming - (source, title, venue, address, event_date, event_time, price, url).
 
-    Returns JPEG bytes: a table with one colored row per game (color = franchise),
-    every row a single line - column widths are sized to the actual content so
-    the table grows wider instead of wrapping or adding gaps between rows.
+    Returns JPEG bytes: a table with one colored row per game (color = franchise).
+    Column widths are sized to the actual content so rows stay single-line and
+    the table grows wider instead of wrapping - only a cell too long even for
+    its capped column wraps, and only that row grows taller.
     """
     font = ImageFont.truetype(str(_FONT_BOLD), _FONT_SIZE)
     title_font = ImageFont.truetype(str(_FONT_BOLD), _TITLE_FONT_SIZE)
     line_height = _FONT_SIZE + 6
-    row_height = line_height + _ROW_PADDING * 2
 
     probe = ImageDraw.Draw(Image.new("RGB", (10, 10)))
 
@@ -129,11 +154,15 @@ def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str
         width = max(header_w, content_w)
         if max_w is not None and width > max_w:
             width = max_w
-            for cell in all_cells:
-                cell[col] = _fit_text(probe, cell[col], font, max_w - _CELL_PADDING)
-        col_width[col] = int(width) + _CELL_PADDING * 2
+        col_width[col] = math.ceil(width) + _CELL_PADDING * 2
 
     table_width = sum(col_width.values())
+
+    for cell in all_cells:
+        cell["_lines"] = {
+            col: _wrap_cell(probe, cell[col], font, col_width[col] - _CELL_PADDING * 2) for col in _COLUMNS
+        }
+        cell["_n_lines"] = max(len(lines) for lines in cell["_lines"].values())
 
     title_bar_height = _TITLE_FONT_SIZE + _ROW_PADDING * 2
     header_height = _FONT_SIZE + _ROW_PADDING * 2
@@ -142,7 +171,8 @@ def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str
     for date_index, (_date_label, cells) in enumerate(entries_by_date):
         if date_index > 0:
             total_height += _DATE_GAP
-        total_height += row_height * len(cells)
+        for cell in cells:
+            total_height += cell["_n_lines"] * line_height + _ROW_PADDING * 2
 
     footer_text = format_freshness(updated_at).removeprefix("🕐 ") if updated_at else None
     footer_height = line_height + _ROW_PADDING * 2 if footer_text else 0
@@ -172,11 +202,13 @@ def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str
         if date_index > 0:
             y += _DATE_GAP
         for cell in cells:
+            row_height = cell["_n_lines"] * line_height + _ROW_PADDING * 2
             color = _ROW_COLORS.get(cell["source"], _DEFAULT_ROW_COLOR)
             draw.rectangle([_MARGIN, y, _MARGIN + table_width, y + row_height], fill=color)
             x = _MARGIN
             for col in _COLUMNS:
-                draw.text((x + _CELL_PADDING, y + _ROW_PADDING), cell[col], font=font, fill=_TEXT_COLOR)
+                for i, line in enumerate(cell["_lines"][col]):
+                    draw.text((x + _CELL_PADDING, y + _ROW_PADDING + i * line_height), line, font=font, fill=_TEXT_COLOR)
                 x += col_width[col]
             y += row_height
 

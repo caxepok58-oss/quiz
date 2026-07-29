@@ -41,7 +41,7 @@ class HeuristicScheduleSource(BaseSource):
     def parse(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "lxml")
         today = date.today()
-        seen: dict[int, Event] = {}
+        seen: dict[int, tuple[Event, str]] = {}
 
         for tag in soup.find_all(CARD_TAGS):
             text = tag.get_text(" ", strip=True)
@@ -64,7 +64,7 @@ class HeuristicScheduleSource(BaseSource):
             if event_date is None:
                 continue
 
-            seen[id(card)] = Event(
+            event = Event(
                 source=self.name,
                 title=self._guess_title(card, card_text),
                 event_date=event_date,
@@ -72,8 +72,10 @@ class HeuristicScheduleSource(BaseSource):
                 venue=self.default_venue,
                 url=self.url,
             )
+            seen[id(card)] = (event, card_text)
 
-        return self._dedup(list(seen.values()))
+        events = self._drop_nested_duplicates(list(seen.values()))
+        return self._dedup(events)
 
     @staticmethod
     def _expand_to_card(tag: Tag, max_levels: int = 3) -> Tag:
@@ -97,6 +99,29 @@ class HeuristicScheduleSource(BaseSource):
         if heading and heading.get_text(strip=True):
             return heading.get_text(strip=True)[:120]
         return card_text[:120]
+
+    @staticmethod
+    def _drop_nested_duplicates(events_with_text: list[tuple[Event, str]]) -> list[Event]:
+        """Card expansion can independently latch onto more than one DOM node
+        for the same real game - e.g. a heading that itself embeds the date
+        ("...играем 29 июля, 19:30...") next to the actual date/venue block,
+        each becoming its own small "card". A franchise doesn't run two
+        different games at the exact same date and time on one schedule
+        page, so when several cards share both, they're the same game seen
+        twice - keep only the one with the longest captured text (the
+        fullest, most complete card)."""
+        groups: dict[tuple, list[tuple[Event, str]]] = {}
+        kept: list[Event] = []
+        for event, text in events_with_text:
+            if event.event_time is None:
+                kept.append(event)
+                continue
+            groups.setdefault((event.event_date, event.event_time), []).append((event, text))
+
+        for group in groups.values():
+            best_event, _ = max(group, key=lambda pair: len(pair[1]))
+            kept.append(best_event)
+        return kept
 
     @staticmethod
     def _dedup(events: list[Event]) -> list[Event]:

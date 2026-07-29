@@ -38,3 +38,23 @@ def test_parse_ignores_blocks_without_a_date():
     source = HeuristicScheduleSource(name="test", url="http://example.test/schedule")
     events = source.parse("<html><body><div>Просто текст без даты</div></body></html>")
     assert events == []
+
+
+def test_parse_collapses_two_cards_sharing_the_same_date_and_time():
+    # A title that itself embeds the date/time ("...играем 29 июля...") can
+    # get card-expanded separately from the actual date/venue block next to
+    # it, producing two rows for one real game. Both share date+time, so
+    # only the fuller card (the one with more surrounding text) should survive.
+    html = """
+    <html><body>
+    <div class="game-row">
+      <div class="title">Игра головой | 4 игра играем 29 июля, среда 19:30 клуб Достоевский</div>
+      <div class="date-venue">29 июля 2026, 19:30 клуб Достоевский 500</div>
+    </div>
+    </body></html>
+    """
+    source = HeuristicScheduleSource(name="test", url="http://example.test/schedule")
+    events = source.parse(html)
+
+    matching = [e for e in events if e.event_date == date(2026, 7, 29) and e.event_time == time(19, 30)]
+    assert len(matching) == 1
