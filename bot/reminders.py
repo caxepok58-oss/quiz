@@ -46,12 +46,14 @@ async def check_reminders(bot: Bot, db: Database, timezone: str, now: datetime |
         events.append((when, source, title, venue, event_date, price, url, dedup_key))
 
     for chat_id, lead_minutes in settings:
-        favorites = await db.get_favorites(chat_id)
+        picked = await db.get_game_reminder_keys(chat_id)
+        if not picked:
+            continue
         window_end = now + timedelta(minutes=lead_minutes)
         for when, source, title, venue, event_date, price, url, dedup_key in events:
-            if not (now <= when <= window_end):
+            if dedup_key not in picked:
                 continue
-            if favorites and source != "manual" and source not in favorites:
+            if not (now <= when <= window_end):
                 continue
             if await db.was_reminder_sent(chat_id, dedup_key):
                 continue

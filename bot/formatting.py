@@ -68,7 +68,7 @@ def franchise_color(source: str) -> str:
     return _FRANCHISE_COLORS.get(source, "⚫")
 
 
-def _format_date_header(d: date) -> str:
+def format_date_header(d: date) -> str:
     return f"{d.day} {_MONTHS_GENITIVE[d.month]} ({_WEEKDAYS[d.weekday()]})"
 
 
@@ -118,7 +118,7 @@ def build_messages(rows, city_name: str, days_ahead: int, updated_at: str | None
     for date_str in sorted(by_date):
         d = date.fromisoformat(date_str)
         entries = sorted(by_date[date_str], key=lambda r: r[0] or "")
-        blocks.append(f"<b>{_format_date_header(d)}</b>\n{_render_day_entries(entries)}")
+        blocks.append(f"<b>{format_date_header(d)}</b>\n{_render_day_entries(entries)}")
 
     header = f"🎯 Квизы в г. {city_name} на ближайшие {days_ahead} дней:\n\n"
     messages = []
