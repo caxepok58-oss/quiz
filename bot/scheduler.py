@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 _REMINDER_CHECK_MINUTES = 15
 
 
-def setup_scheduler(db: Database, bot: Bot, scrape_hour: int, timezone: str) -> AsyncIOScheduler:
+def setup_scheduler(db: Database, bot: Bot, scrape_hour: int, timezone: str, admin_ids: set[int]) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone=timezone)
 
     async def refresh_job() -> None:
         logger.info("Running scheduled quiz-schedule refresh")
-        await refresh_all(db)
+        await refresh_all(db, bot, admin_ids)
         await db.purge_old_events(date.today() - timedelta(days=1))
 
     async def reminder_job() -> None:

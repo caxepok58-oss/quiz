@@ -166,3 +166,39 @@ async def test_toggle_game_reminder(db):
     subscribed = await db.toggle_game_reminder(chat_id, "quizplease|a", "2026-08-05")
     assert subscribed is False
     assert await db.get_game_reminder_keys(chat_id) == set()
+
+
+@pytest.mark.asyncio
+async def test_set_source_status_alerts_only_on_the_third_consecutive_failed_day(db):
+    day1, day2, day3, day4 = date(2026, 8, 1), date(2026, 8, 2), date(2026, 8, 3), date(2026, 8, 4)
+
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day1) is False
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day2) is False
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day3) is True
+    # Already alerted for this outage - stays quiet on further failed days.
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day4) is False
+
+
+@pytest.mark.asyncio
+async def test_set_source_status_repeated_same_day_failure_does_not_advance_the_streak(db):
+    day1 = date(2026, 8, 1)
+
+    await db.set_source_status("shakerquiz", False, "boom", 0, today=day1)
+    await db.set_source_status("shakerquiz", False, "boom", 0, today=day1)
+    await db.set_source_status("shakerquiz", False, "boom", 0, today=day1)
+    # Same calendar day 3 times in a row (e.g. manual /update retries) should count as one day.
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day1) is False
+
+
+@pytest.mark.asyncio
+async def test_set_source_status_success_resets_the_streak_and_can_alert_again(db):
+    day1, day2, day3 = date(2026, 8, 1), date(2026, 8, 2), date(2026, 8, 3)
+
+    await db.set_source_status("shakerquiz", False, "boom", 0, today=day1)
+    await db.set_source_status("shakerquiz", False, "boom", 0, today=day2)
+    assert await db.set_source_status("shakerquiz", True, "ok", 5, today=day3) is False
+
+    day4, day5, day6 = date(2026, 8, 4), date(2026, 8, 5), date(2026, 8, 6)
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day4) is False
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day5) is False
+    assert await db.set_source_status("shakerquiz", False, "boom", 0, today=day6) is True

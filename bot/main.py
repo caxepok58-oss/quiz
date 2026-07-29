@@ -55,8 +55,8 @@ async def main() -> None:
     dp["admin_ids"] = config.admin_ids
 
     logger.info("Running initial schedule refresh")
-    await refresh_all(db)
-    scheduler = setup_scheduler(db, bot, config.scrape_hour, config.timezone)
+    await refresh_all(db, bot, config.admin_ids)
+    scheduler = setup_scheduler(db, bot, config.scrape_hour, config.timezone, config.admin_ids)
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)

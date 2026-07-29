@@ -36,7 +36,10 @@ CREATE TABLE IF NOT EXISTS source_status (
     ok INTEGER NOT NULL,
     message TEXT,
     events_found INTEGER NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    last_failure_date TEXT,
+    alerted INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS favorites (
@@ -65,6 +68,10 @@ CREATE TABLE IF NOT EXISTS game_reminders (
 );
 """
 
+# How many consecutive failed refreshes (roughly, days - refresh runs once/day) before
+# alerting admins that a source is down. Only fires once per outage, not every day after.
+ALERT_AFTER_DAYS = 3
+
 
 class Database:
     def __init__(self, path: str):
@@ -74,7 +81,20 @@ class Database:
     async def connect(self) -> None:
         self._conn = await aiosqlite.connect(self._path)
         await self._conn.executescript(_SCHEMA)
+        await self._migrate()
         await self._conn.commit()
+
+    async def _migrate(self) -> None:
+        """Add columns introduced after this table already existed on a deployed DB."""
+        conn = self._conn
+        cur = await conn.execute("PRAGMA table_info(source_status)")
+        columns = {row[1] for row in await cur.fetchall()}
+        if "consecutive_failures" not in columns:
+            await conn.execute("ALTER TABLE source_status ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0")
+        if "last_failure_date" not in columns:
+            await conn.execute("ALTER TABLE source_status ADD COLUMN last_failure_date TEXT")
+        if "alerted" not in columns:
+            await conn.execute("ALTER TABLE source_status ADD COLUMN alerted INTEGER NOT NULL DEFAULT 0")
 
     async def close(self) -> None:
         if self._conn:
@@ -104,17 +124,51 @@ class Database:
             )
         await conn.commit()
 
-    async def set_source_status(self, source: str, ok: bool, message: str, events_found: int) -> None:
+    async def set_source_status(
+        self, source: str, ok: bool, message: str, events_found: int, today: date | None = None
+    ) -> bool:
+        """Record a source's refresh outcome. Returns True the moment it crosses
+        ALERT_AFTER_DAYS consecutive failed days (once per outage, not repeatedly)."""
         conn = self._conn
+        cur = await conn.execute(
+            "SELECT consecutive_failures, last_failure_date, alerted FROM source_status WHERE source = ?", (source,)
+        )
+        row = await cur.fetchone()
+        consecutive_failures, last_failure_date, alerted = row if row else (0, None, 0)
+
+        should_alert = False
+        today = (today or date.today()).isoformat()
+        if ok:
+            consecutive_failures, last_failure_date, alerted = 0, None, 0
+        else:
+            if last_failure_date != today:
+                consecutive_failures += 1
+                last_failure_date = today
+            if consecutive_failures >= ALERT_AFTER_DAYS and not alerted:
+                should_alert = True
+                alerted = 1
+
         await conn.execute(
-            """INSERT INTO source_status (source, ok, message, events_found, updated_at)
-               VALUES (?, ?, ?, ?, ?)
+            """INSERT INTO source_status
+               (source, ok, message, events_found, updated_at, consecutive_failures, last_failure_date, alerted)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(source) DO UPDATE SET
-                 ok=excluded.ok, message=excluded.message,
-                 events_found=excluded.events_found, updated_at=excluded.updated_at""",
-            (source, int(ok), message, events_found, datetime.utcnow().isoformat()),
+                 ok=excluded.ok, message=excluded.message, events_found=excluded.events_found,
+                 updated_at=excluded.updated_at, consecutive_failures=excluded.consecutive_failures,
+                 last_failure_date=excluded.last_failure_date, alerted=excluded.alerted""",
+            (
+                source,
+                int(ok),
+                message,
+                events_found,
+                datetime.utcnow().isoformat(),
+                consecutive_failures,
+                last_failure_date,
+                int(alerted),
+            ),
         )
         await conn.commit()
+        return should_alert
 
     async def get_source_statuses(self):
         conn = self._conn
