@@ -1,4 +1,5 @@
 from datetime import date
+from html import escape
 
 _WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 _MONTHS_GENITIVE = [
@@ -63,10 +64,13 @@ def _render_day_entries(entries: list[tuple]) -> str:
     # the alignment - a card per game (free-flowing lines, no fixed width) has
     # nothing to misalign and reads fine on any screen size.
     cards = []
-    for event_time, title, venue, price, source in entries:
+    for event_time, title, venue, price, source, url in entries:
         price_str = f" · {price} ₽" if price else ""
         header_line = f"{_franchise_color(source)} {event_time or '??:??'} · {_franchise_name(source)}{price_str}"
-        cards.append(f"{header_line}\n{title or '—'}\n📍 {venue or 'уточняется'}")
+        title_display = escape(title) if title else "—"
+        if url:
+            title_display = f'<a href="{escape(url)}">{title_display}</a>'
+        cards.append(f"{header_line}\n{title_display}\n📍 {venue or 'уточняется'}")
     return "\n\n".join(cards)
 
 
@@ -76,8 +80,8 @@ def build_messages(rows, city_name: str, days_ahead: int) -> list[str]:
         return [f"На ближайшие {days_ahead} дней в г. {city_name} игр не найдено."]
 
     by_date: dict[str, list[tuple]] = {}
-    for source, title, venue, _address, event_date, event_time, price, _url in rows:
-        by_date.setdefault(event_date, []).append((event_time, title, venue, price, source))
+    for source, title, venue, _address, event_date, event_time, price, url in rows:
+        by_date.setdefault(event_date, []).append((event_time, title, venue, price, source, url))
 
     blocks = []
     for date_str in sorted(by_date):
