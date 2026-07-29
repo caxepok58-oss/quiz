@@ -53,8 +53,10 @@ _TITLE_BG = (38, 50, 56)
 _TITLE_TEXT = (255, 255, 255)
 _HEADER_BG = (69, 90, 100)
 _HEADER_TEXT = (255, 255, 255)
+_WEEKEND_COLOR = (198, 40, 40)
 
 _WEEKDAYS = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"]
+_WEEKEND_LABELS = {"СБ", "ВС"}
 
 _COLUMNS = ["date", "time", "franchise", "venue", "title", "price"]
 _COL_HEADERS = {
@@ -208,7 +210,16 @@ def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str
             x = _MARGIN
             for col in _COLUMNS:
                 for i, line in enumerate(cell["_lines"][col]):
-                    draw.text((x + _CELL_PADDING, y + _ROW_PADDING + i * line_height), line, font=font, fill=_TEXT_COLOR)
+                    ly = y + _ROW_PADDING + i * line_height
+                    lx = x + _CELL_PADDING
+                    weekday_label = line.rsplit(" ", 1)[-1] if col == "date" else None
+                    if weekday_label in _WEEKEND_LABELS:
+                        main_text = line[: -len(weekday_label)].rstrip()
+                        draw.text((lx, ly), main_text, font=font, fill=_TEXT_COLOR)
+                        lx += draw.textlength(f"{main_text} ", font=font)
+                        draw.text((lx, ly), weekday_label, font=font, fill=_WEEKEND_COLOR)
+                    else:
+                        draw.text((lx, ly), line, font=font, fill=_TEXT_COLOR)
                 x += col_width[col]
             y += row_height
 
