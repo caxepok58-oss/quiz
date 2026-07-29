@@ -6,7 +6,7 @@ from aiogram.types import BufferedInputFile, Message
 
 from ..db import Database
 from ..formatting import build_messages
-from ..keyboards import BTN_7_DAYS, BTN_30_DAYS, BTN_SCHEDULE_IMAGE_7, BTN_SCHEDULE_IMAGE_30
+from ..keyboards import BTN_7_DAYS, BTN_30_DAYS, BTN_SCHEDULE_IMAGE_7, BTN_SCHEDULE_IMAGE_14, BTN_SCHEDULE_IMAGE_30
 from ..schedule_image import render_schedule_image
 
 router = Router(name="games")
@@ -59,3 +59,9 @@ async def btn_schedule_image_30(message: Message, db: Database, city_name: str) 
 @router.message(F.text == BTN_SCHEDULE_IMAGE_7)
 async def btn_schedule_image_7(message: Message, db: Database, city_name: str) -> None:
     await _send_schedule_image(message, db, city_name, 7)
+
+
+@router.message(Command("schedule_image_2weeks"))
+@router.message(F.text == BTN_SCHEDULE_IMAGE_14)
+async def btn_schedule_image_14(message: Message, db: Database, city_name: str) -> None:
+    await _send_schedule_image(message, db, city_name, 14)
