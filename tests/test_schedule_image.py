@@ -21,7 +21,7 @@ def test_render_schedule_image_returns_valid_jpeg():
 def test_render_schedule_image_grows_taller_with_more_games():
     few_rows = [("quizplease", "Игра А", "Место", None, "2026-08-05", "19:00", None, None)]
     many_rows = [
-        ("quizplease", f"Игра {i}", "Место", None, "2026-08-05", f"{10 + i}:00", None, None) for i in range(20)
+        ("quizplease", "Игра А", "Место", None, "2026-08-05", f"{10 + i}:00", None, None) for i in range(20)
     ]
 
     short_img = Image.open(io.BytesIO(render_schedule_image(few_rows, "Пенза", 30)))

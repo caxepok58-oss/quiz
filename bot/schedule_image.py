@@ -18,19 +18,17 @@ _FONT_BOLD = _FONT_DIR / "DejaVuSans-Bold.ttf"
 # bigger font costs, since it removes one whole row per calendar day.
 _FONT_SIZE = 21
 _TITLE_FONT_SIZE = 28
-_LINE_HEIGHT = 27
 _ROW_PADDING = 5
 _CELL_PADDING = 8
 _MARGIN = 20
 _DATE_GAP = 12  # blank space between two different dates' row groups
 
-_COL_DATE_W = 200
-_COL_TIME_W = 90
-_COL_FRANCHISE_W = 190
-_COL_VENUE_W = 220
-_COL_TITLE_W = 400
-_COL_PRICE_W = 100
-_TABLE_WIDTH = _COL_DATE_W + _COL_TIME_W + _COL_FRANCHISE_W + _COL_VENUE_W + _COL_TITLE_W + _COL_PRICE_W
+# Every row is a single line - column widths are computed per-image from the
+# actual text so nothing wraps or gets clipped, at the cost of a wider table.
+# These caps only guard against one pathologically long title/venue blowing
+# the image out; ordinary data never gets near them.
+_COL_TITLE_MAX_W = 700
+_COL_VENUE_MAX_W = 500
 
 # Pastel per-franchise row backgrounds - saturated enough to tell rows apart,
 # light enough that dark text stays readable without needing per-row text color.
@@ -56,57 +54,43 @@ _HEADER_TEXT = (255, 255, 255)
 
 _WEEKDAYS = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"]
 
-_HEADERS = [
-    ("Дата", _COL_DATE_W),
-    ("Время", _COL_TIME_W),
-    ("Франшиза", _COL_FRANCHISE_W),
-    ("Место", _COL_VENUE_W),
-    ("Игра", _COL_TITLE_W),
-    ("Цена", _COL_PRICE_W),
-]
+_COLUMNS = ["date", "time", "franchise", "venue", "title", "price"]
+_COL_HEADERS = {
+    "date": "Дата",
+    "time": "Время",
+    "franchise": "Франшиза",
+    "venue": "Место",
+    "title": "Игра",
+    "price": "Цена",
+}
+_COL_MAX_W = {"venue": _COL_VENUE_MAX_W, "title": _COL_TITLE_MAX_W}
 
 
 def _format_short_date(d: date) -> str:
     return f"{d:%d.%m.%Y} {_WEEKDAYS[d.weekday()]}"
 
 
-def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int, max_lines: int = 2) -> list[str]:
+def _fit_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> str:
+    """Truncate to a single line with an ellipsis if it doesn't fit max_width."""
     text = (text or "").strip()
-    if not text:
-        return [""]
-    words = text.split()
-    lines: list[str] = []
-    current = ""
-    for word in words:
-        candidate = f"{current} {word}".strip()
-        if current and draw.textlength(candidate, font=font) > max_width:
-            lines.append(current)
-            current = word
-        else:
-            current = candidate
-    lines.append(current)
-
-    if len(lines) <= max_lines:
-        return lines
-
-    kept = lines[:max_lines]
-    last = kept[-1]
-    while last and draw.textlength(f"{last}…", font=font) > max_width:
-        last = last[:-1]
-    kept[-1] = f"{last}…"
-    return kept
+    if not text or draw.textlength(text, font=font) <= max_width:
+        return text
+    while text and draw.textlength(f"{text}…", font=font) > max_width:
+        text = text[:-1]
+    return f"{text}…"
 
 
 def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str | None = None) -> bytes:
     """rows: same shape as Database.get_upcoming - (source, title, venue, address, event_date, event_time, price, url).
 
-    Returns JPEG bytes: a table with one colored row per game (color = franchise).
-    The date is its own column on every row rather than a separate full-width
-    bar per day, with just a small gap between groups - much shorter overall
-    than a scheme that spends a whole extra row on every calendar date.
+    Returns JPEG bytes: a table with one colored row per game (color = franchise),
+    every row a single line - column widths are sized to the actual content so
+    the table grows wider instead of wrapping or adding gaps between rows.
     """
     font = ImageFont.truetype(str(_FONT_BOLD), _FONT_SIZE)
     title_font = ImageFont.truetype(str(_FONT_BOLD), _TITLE_FONT_SIZE)
+    line_height = _FONT_SIZE + 6
+    row_height = line_height + _ROW_PADDING * 2
 
     probe = ImageDraw.Draw(Image.new("RGB", (10, 10)))
 
@@ -114,40 +98,61 @@ def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str
     for source, game_title, venue, _address, event_date, event_time, price, _url in rows:
         by_date.setdefault(event_date, []).append((event_time, game_title, venue, price, source))
 
-    title_bar_height = _TITLE_FONT_SIZE + _ROW_PADDING * 2
-    header_height = _FONT_SIZE + _ROW_PADDING * 2
-
-    layout: list[tuple] = []  # ("row", data, height) | ("gap", None, height)
-    total_height = _MARGIN + title_bar_height + header_height
-
-    sorted_dates = sorted(by_date)
-    for date_index, date_str in enumerate(sorted_dates):
-        if date_index > 0:
-            layout.append(("gap", None, _DATE_GAP))
-            total_height += _DATE_GAP
-
+    entries_by_date: list[tuple[str, list[tuple]]] = []
+    for date_str in sorted(by_date):
         d = date.fromisoformat(date_str)
         date_label = _format_short_date(d)
         entries = sorted(by_date[date_str], key=lambda r: r[0] or "")
+        cells = []
         for event_time, game_title, venue, price, source in entries:
-            title_lines = _wrap_text(probe, game_title or "—", font, _COL_TITLE_W - _CELL_PADDING * 2)
-            venue_lines = _wrap_text(probe, venue or "уточняется", font, _COL_VENUE_W - _CELL_PADDING * 2)
-            n_lines = max(len(title_lines), len(venue_lines), 1)
-            row_height = n_lines * _LINE_HEIGHT + _ROW_PADDING * 2
-            layout.append(("row", (date_label, event_time, title_lines, venue_lines, price, source), row_height))
-            total_height += row_height
+            price_text = f"{price} ₽" if price else ""
+            cells.append(
+                {
+                    "date": date_label,
+                    "time": event_time or "??:??",
+                    "franchise": franchise_name(source),
+                    "venue": venue or "уточняется",
+                    "title": game_title or "—",
+                    "price": price_text,
+                    "source": source,
+                }
+            )
+        entries_by_date.append((date_label, cells))
 
-    # DejaVu Sans has no color-emoji glyphs, so drop the leading icon that
-    # format_freshness() adds for the (emoji-capable) Telegram text messages.
+    all_cells = [cell for _, cells in entries_by_date for cell in cells]
+
+    col_width: dict[str, int] = {}
+    for col in _COLUMNS:
+        header_w = probe.textlength(_COL_HEADERS[col], font=font)
+        content_w = max((probe.textlength(cell[col], font=font) for cell in all_cells), default=0)
+        max_w = _COL_MAX_W.get(col)
+        width = max(header_w, content_w)
+        if max_w is not None and width > max_w:
+            width = max_w
+            for cell in all_cells:
+                cell[col] = _fit_text(probe, cell[col], font, max_w - _CELL_PADDING)
+        col_width[col] = int(width) + _CELL_PADDING * 2
+
+    table_width = sum(col_width.values())
+
+    title_bar_height = _TITLE_FONT_SIZE + _ROW_PADDING * 2
+    header_height = _FONT_SIZE + _ROW_PADDING * 2
+
+    total_height = _MARGIN + title_bar_height + header_height
+    for date_index, (_date_label, cells) in enumerate(entries_by_date):
+        if date_index > 0:
+            total_height += _DATE_GAP
+        total_height += row_height * len(cells)
+
     footer_text = format_freshness(updated_at).removeprefix("🕐 ") if updated_at else None
-    footer_height = _LINE_HEIGHT + _ROW_PADDING * 2 if footer_text else 0
+    footer_height = line_height + _ROW_PADDING * 2 if footer_text else 0
     total_height += footer_height + _MARGIN
 
-    img = Image.new("RGB", (_TABLE_WIDTH + _MARGIN * 2, total_height), _BG_COLOR)
+    img = Image.new("RGB", (table_width + _MARGIN * 2, total_height), _BG_COLOR)
     draw = ImageDraw.Draw(img)
 
     y = _MARGIN
-    draw.rectangle([_MARGIN, y, _MARGIN + _TABLE_WIDTH, y + title_bar_height], fill=_TITLE_BG)
+    draw.rectangle([_MARGIN, y, _MARGIN + table_width, y + title_bar_height], fill=_TITLE_BG)
     draw.text(
         (_MARGIN + _CELL_PADDING, y + _ROW_PADDING),
         f"Квизы в г. {city_name} — расписание на {days_ahead} дней",
@@ -156,39 +161,24 @@ def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str
     )
     y += title_bar_height
 
-    draw.rectangle([_MARGIN, y, _MARGIN + _TABLE_WIDTH, y + header_height], fill=_HEADER_BG)
+    draw.rectangle([_MARGIN, y, _MARGIN + table_width, y + header_height], fill=_HEADER_BG)
     x = _MARGIN
-    for text, width in _HEADERS:
-        draw.text((x + _CELL_PADDING, y + _ROW_PADDING), text, font=font, fill=_HEADER_TEXT)
-        x += width
+    for col in _COLUMNS:
+        draw.text((x + _CELL_PADDING, y + _ROW_PADDING), _COL_HEADERS[col], font=font, fill=_HEADER_TEXT)
+        x += col_width[col]
     y += header_height
 
-    for kind, payload, height in layout:
-        if kind == "gap":
-            y += height
-            continue
-
-        date_label, event_time, title_lines, venue_lines, price, source = payload
-        color = _ROW_COLORS.get(source, _DEFAULT_ROW_COLOR)
-        draw.rectangle([_MARGIN, y, _MARGIN + _TABLE_WIDTH, y + height], fill=color)
-
-        x = _MARGIN
-        draw.text((x + _CELL_PADDING, y + _ROW_PADDING), date_label, font=font, fill=_TEXT_COLOR)
-        x += _COL_DATE_W
-        draw.text((x + _CELL_PADDING, y + _ROW_PADDING), event_time or "??:??", font=font, fill=_TEXT_COLOR)
-        x += _COL_TIME_W
-        draw.text((x + _CELL_PADDING, y + _ROW_PADDING), franchise_name(source), font=font, fill=_TEXT_COLOR)
-        x += _COL_FRANCHISE_W
-        for i, line in enumerate(venue_lines):
-            draw.text((x + _CELL_PADDING, y + _ROW_PADDING + i * _LINE_HEIGHT), line, font=font, fill=_TEXT_COLOR)
-        x += _COL_VENUE_W
-        for i, line in enumerate(title_lines):
-            draw.text((x + _CELL_PADDING, y + _ROW_PADDING + i * _LINE_HEIGHT), line, font=font, fill=_TEXT_COLOR)
-        x += _COL_TITLE_W
-        price_text = f"{price} ₽" if price else ""
-        draw.text((x + _CELL_PADDING, y + _ROW_PADDING), price_text, font=font, fill=_TEXT_COLOR)
-
-        y += height
+    for date_index, (_date_label, cells) in enumerate(entries_by_date):
+        if date_index > 0:
+            y += _DATE_GAP
+        for cell in cells:
+            color = _ROW_COLORS.get(cell["source"], _DEFAULT_ROW_COLOR)
+            draw.rectangle([_MARGIN, y, _MARGIN + table_width, y + row_height], fill=color)
+            x = _MARGIN
+            for col in _COLUMNS:
+                draw.text((x + _CELL_PADDING, y + _ROW_PADDING), cell[col], font=font, fill=_TEXT_COLOR)
+                x += col_width[col]
+            y += row_height
 
     if footer_text:
         draw.text((_MARGIN, y + _ROW_PADDING), footer_text, font=font, fill=_MUTED_TEXT_COLOR)
