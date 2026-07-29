@@ -6,12 +6,10 @@ from aiogram.types import BufferedInputFile, Message
 
 from ..db import Database
 from ..formatting import build_messages
-from ..keyboards import BTN_7_DAYS, BTN_30_DAYS, BTN_SCHEDULE_IMAGE
+from ..keyboards import BTN_7_DAYS, BTN_30_DAYS, BTN_SCHEDULE_IMAGE_7, BTN_SCHEDULE_IMAGE_30
 from ..schedule_image import render_schedule_image
 
 router = Router(name="games")
-
-_IMAGE_DAYS = 30
 
 
 async def _send_games(message: Message, db: Database, city_name: str, days: int) -> None:
@@ -38,16 +36,26 @@ async def btn_games_30_days(message: Message, db: Database, city_name: str) -> N
     await _send_games(message, db, city_name, 30)
 
 
-@router.message(Command("schedule_image"))
-@router.message(F.text == BTN_SCHEDULE_IMAGE)
-async def btn_schedule_image(message: Message, db: Database, city_name: str) -> None:
+async def _send_schedule_image(message: Message, db: Database, city_name: str, days: int) -> None:
     await message.answer("Генерирую картинку с расписанием…")
     today = date.today()
-    rows = await db.get_upcoming(today, today + timedelta(days=_IMAGE_DAYS))  # full schedule, all franchises
+    rows = await db.get_upcoming(today, today + timedelta(days=days))  # full schedule, all franchises
     if not rows:
-        await message.answer(f"На ближайшие {_IMAGE_DAYS} дней в г. {city_name} игр не найдено.")
+        await message.answer(f"На ближайшие {days} дней в г. {city_name} игр не найдено.")
         return
     updated_at = await db.get_last_successful_update()
-    image_bytes = render_schedule_image(rows, city_name, _IMAGE_DAYS, updated_at)
+    image_bytes = render_schedule_image(rows, city_name, days, updated_at)
     photo = BufferedInputFile(image_bytes, filename="schedule.jpg")
-    await message.answer_photo(photo, caption=f"Полное расписание квизов в г. {city_name} на {_IMAGE_DAYS} дней")
+    await message.answer_photo(photo, caption=f"Полное расписание квизов в г. {city_name} на {days} дней")
+
+
+@router.message(Command("schedule_image"))
+@router.message(F.text == BTN_SCHEDULE_IMAGE_30)
+async def btn_schedule_image_30(message: Message, db: Database, city_name: str) -> None:
+    await _send_schedule_image(message, db, city_name, 30)
+
+
+@router.message(Command("schedule_image_week"))
+@router.message(F.text == BTN_SCHEDULE_IMAGE_7)
+async def btn_schedule_image_7(message: Message, db: Database, city_name: str) -> None:
+    await _send_schedule_image(message, db, city_name, 7)
