@@ -1,4 +1,3 @@
-import textwrap
 from datetime import date
 
 _WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
@@ -57,63 +56,17 @@ def _format_date_header(d: date) -> str:
     return f"{d.day} {_MONTHS_GENITIVE[d.month]} ({_WEEKDAYS[d.weekday()]})"
 
 
-_COL_TIME = 6
-_COL_FRANCHISE = 16
-_COL_TITLE = 20
-_COL_VENUE = 18
-_COL_PRICE = 10
-
-
-def _wrap(text: str, width: int) -> list[str]:
-    text = text or ""
-    return textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False) or [""]
-
-
-def _pad(text: str, width: int) -> str:
-    # Plain character-count padding. A previous attempt compensated for the
-    # franchise-color emoji as if it rendered two cells wide, but that only
-    # patched the line the emoji sits on - the blank continuation line(s) of
-    # a wrapped row got the uncompensated (correct) padding instead, so the
-    # two physical lines of the same row ended up column-misaligned with
-    # each other. Keeping this uniform guarantees every line of a row lines
-    # up with the header, regardless of how wide any single glyph renders.
-    return text + " " * max(0, width - len(text))
-
-
-_ROW_WIDTH = _COL_TIME + _COL_FRANCHISE + _COL_TITLE + _COL_VENUE + _COL_PRICE + 4  # + 4 "|" separators
-
-
-def _row(time_col: str, franchise_col: str, title_col: str, venue_col: str, price_col: str) -> str:
-    return (
-        f"{_pad(time_col, _COL_TIME)}|"
-        f"{_pad(franchise_col, _COL_FRANCHISE)}|"
-        f"{_pad(title_col, _COL_TITLE)}|"
-        f"{_pad(venue_col, _COL_VENUE)}|"
-        f"{_pad(price_col, _COL_PRICE)}"
-    )
-
-
-def _render_day_table(entries: list[tuple]) -> str:
-    separator = "_" * _ROW_WIDTH
-    lines = [_row("Время", "Франшиза", "Игра", "Место проведения", "Стоимость"), separator]
+def _render_day_entries(entries: list[tuple]) -> str:
+    # A fixed-width "|" grid breaks on narrow phone screens: Telegram soft-wraps
+    # any line too long for the viewport, splitting it mid-column and destroying
+    # the alignment - a card per game (free-flowing lines, no fixed width) has
+    # nothing to misalign and reads fine on any screen size.
+    cards = []
     for event_time, title, venue, price, source in entries:
-        franchise = f"{_franchise_color(source)} {_franchise_name(source)}"
-        price_str = f"{price} ₽" if price else ""
-        title_lines = _wrap(title or "—", _COL_TITLE)
-        venue_lines = _wrap(venue or "уточняется", _COL_VENUE)
-        row_height = max(len(title_lines), len(venue_lines))
-        for i in range(row_height):
-            lines.append(
-                _row(
-                    (event_time or "??:??") if i == 0 else "",
-                    franchise if i == 0 else "",
-                    title_lines[i] if i < len(title_lines) else "",
-                    venue_lines[i] if i < len(venue_lines) else "",
-                    price_str if i == 0 else "",
-                )
-            )
-        lines.append(separator)
-    return "<pre>" + "\n".join(lines) + "</pre>"
+        price_str = f" · {price} ₽" if price else ""
+        header_line = f"{_franchise_color(source)} {event_time or '??:??'} · {_franchise_name(source)}{price_str}"
+        cards.append(f"{header_line}\n{title or '—'}\n📍 {venue or 'уточняется'}")
+    return "\n\n".join(cards)
 
 
 def build_messages(rows, city_name: str, days_ahead: int) -> list[str]:
@@ -129,7 +82,7 @@ def build_messages(rows, city_name: str, days_ahead: int) -> list[str]:
     for date_str in sorted(by_date):
         d = date.fromisoformat(date_str)
         entries = sorted(by_date[date_str], key=lambda r: r[0] or "")
-        blocks.append(f"<b>{_format_date_header(d)}</b>\n{_render_day_table(entries)}")
+        blocks.append(f"<b>{_format_date_header(d)}</b>\n{_render_day_entries(entries)}")
 
     header = f"🎯 Квизы в г. {city_name} на ближайшие {days_ahead} дней:\n\n"
     messages = []
