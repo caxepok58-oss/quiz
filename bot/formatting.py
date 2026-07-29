@@ -69,15 +69,15 @@ def _wrap(text: str, width: int) -> list[str]:
     return textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False) or [""]
 
 
-def _display_width(text: str) -> int:
-    # Colored circle emoji (and other pictographs) render roughly two
-    # monospace cells wide in Telegram's <pre> font, but len() counts them
-    # as one character - padding with len() alone drifts the "|" dividers.
-    return sum(2 if ord(ch) >= 0x1F000 else 1 for ch in text)
-
-
 def _pad(text: str, width: int) -> str:
-    return text + " " * max(0, width - _display_width(text))
+    # Plain character-count padding. A previous attempt compensated for the
+    # franchise-color emoji as if it rendered two cells wide, but that only
+    # patched the line the emoji sits on - the blank continuation line(s) of
+    # a wrapped row got the uncompensated (correct) padding instead, so the
+    # two physical lines of the same row ended up column-misaligned with
+    # each other. Keeping this uniform guarantees every line of a row lines
+    # up with the header, regardless of how wide any single glyph renders.
+    return text + " " * max(0, width - len(text))
 
 
 _ROW_WIDTH = _COL_TIME + _COL_FRANCHISE + _COL_TITLE + _COL_VENUE + _COL_PRICE + 4  # + 4 "|" separators
