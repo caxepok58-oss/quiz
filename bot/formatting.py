@@ -39,21 +39,15 @@ def _format_date_header(d: date) -> str:
     return f"{d.day} {_MONTHS_GENITIVE[d.month]} ({_WEEKDAYS[d.weekday()]})"
 
 
-def _truncate(text: str | None, width: int) -> str:
-    text = text or ""
-    return text if len(text) <= width else text[: width - 1] + "…"
-
 
 def _render_day_table(entries: list[tuple]) -> str:
-    lines = [f"{'Время':<6}{'Франшиза':<14}{'Игра':<24}{'Место':<16}"]
-    lines.append("-" * 60)
-    for event_time, title, venue, price, source in entries:
-        time_part = (event_time or "??:??").ljust(6)
-        franchise_part = _truncate(_franchise_name(source), 12).ljust(14)
-        title_part = _truncate(title, 22).ljust(24)
-        venue_part = _truncate(venue or "уточняется", 16)
-        price_part = f"  {price}" if price else ""
-        lines.append(f"{time_part}{franchise_part}{title_part}{venue_part}{price_part}")
+    lines = []
+    for i, (event_time, title, venue, price, source) in enumerate(entries):
+        if i > 0:
+            lines.append("")
+        price_str = f"  {price} ₽" if price else ""
+        lines.append(f"{(event_time or '??:??'):<6}{_franchise_name(source)}{price_str}")
+        lines.append(f"  {title or '—'} — {venue or 'уточняется'}")
     return "<pre>" + "\n".join(lines) + "</pre>"
 
 
