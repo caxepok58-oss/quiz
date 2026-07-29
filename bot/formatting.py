@@ -1,3 +1,4 @@
+import textwrap
 from datetime import date
 
 _WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
@@ -56,15 +57,47 @@ def _format_date_header(d: date) -> str:
     return f"{d.day} {_MONTHS_GENITIVE[d.month]} ({_WEEKDAYS[d.weekday()]})"
 
 
+_COL_TIME = 6
+_COL_FRANCHISE = 16
+_COL_TITLE = 20
+_COL_VENUE = 18
+_COL_PRICE = 10
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    text = text or ""
+    return textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False) or [""]
+
+
+def _row(time_col: str, franchise_col: str, title_col: str, venue_col: str, price_col: str) -> str:
+    return (
+        f"{time_col:<{_COL_TIME}}"
+        f"{franchise_col:<{_COL_FRANCHISE}}"
+        f"{title_col:<{_COL_TITLE}}"
+        f"{venue_col:<{_COL_VENUE}}"
+        f"{price_col:<{_COL_PRICE}}"
+    )
+
 
 def _render_day_table(entries: list[tuple]) -> str:
-    lines = []
-    for i, (event_time, title, venue, price, source) in enumerate(entries):
-        if i > 0:
-            lines.append("")
-        price_str = f"  {price} ₽" if price else ""
-        lines.append(f"{(event_time or '??:??'):<6}{_franchise_color(source)} {_franchise_name(source)}{price_str}")
-        lines.append(f"  {title or '—'} — {venue or 'уточняется'}")
+    lines = [_row("Время", "Франшиза", "Игра", "Место проведения", "Стоимость")]
+    lines.append("-" * (_COL_TIME + _COL_FRANCHISE + _COL_TITLE + _COL_VENUE + _COL_PRICE))
+    for event_time, title, venue, price, source in entries:
+        franchise = f"{_franchise_color(source)} {_franchise_name(source)}"
+        price_str = f"{price} ₽" if price else ""
+        title_lines = _wrap(title or "—", _COL_TITLE)
+        venue_lines = _wrap(venue or "уточняется", _COL_VENUE)
+        row_height = max(len(title_lines), len(venue_lines))
+        for i in range(row_height):
+            lines.append(
+                _row(
+                    (event_time or "??:??") if i == 0 else "",
+                    franchise if i == 0 else "",
+                    title_lines[i] if i < len(title_lines) else "",
+                    venue_lines[i] if i < len(venue_lines) else "",
+                    price_str if i == 0 else "",
+                )
+            )
     return "<pre>" + "\n".join(lines) + "</pre>"
 
 
