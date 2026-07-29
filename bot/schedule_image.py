@@ -53,7 +53,6 @@ _TITLE_BG = (38, 50, 56)
 _TITLE_TEXT = (255, 255, 255)
 _HEADER_BG = (69, 90, 100)
 _HEADER_TEXT = (255, 255, 255)
-_GRID_COLOR = (189, 189, 189)
 
 _WEEKDAYS = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"]
 
@@ -65,11 +64,6 @@ _HEADERS = [
     ("Игра", _COL_TITLE_W),
     ("Цена", _COL_PRICE_W),
 ]
-
-# x-offsets (from the table's left edge) of every column boundary, for grid lines.
-_COLUMN_BOUNDARIES = [0]
-for _, _width in _HEADERS:
-    _COLUMN_BOUNDARIES.append(_COLUMN_BOUNDARIES[-1] + _width)
 
 
 def _format_short_date(d: date) -> str:
@@ -194,10 +188,6 @@ def render_schedule_image(rows, city_name: str, days_ahead: int, updated_at: str
         price_text = f"{price} ₽" if price else ""
         draw.text((x + _CELL_PADDING, y + _ROW_PADDING), price_text, font=font, fill=_TEXT_COLOR)
 
-        for boundary in _COLUMN_BOUNDARIES:
-            x_line = _MARGIN + boundary
-            draw.line([x_line, y, x_line, y + height], fill=_GRID_COLOR)
-        draw.line([_MARGIN, y + height, _MARGIN + _TABLE_WIDTH, y + height], fill=_GRID_COLOR)
         y += height
 
     if footer_text:
