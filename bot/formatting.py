@@ -30,9 +30,26 @@ _FRANCHISE_NAMES = {
     "manual": "Вручную",
 }
 
+# Telegram text formatting has no color; colored circle emoji stand in as a
+# per-franchise color marker instead.
+_FRANCHISE_COLORS = {
+    "quizplease": "🔴",
+    "club60sec": "🟠",
+    "shakerquiz": "🟡",
+    "brainsurf": "🟢",
+    "mamaquiz": "🔵",
+    "wowquiz": "🟣",
+    "mozgoboynya": "🟤",
+    "manual": "⚪",
+}
+
 
 def _franchise_name(source: str) -> str:
     return _FRANCHISE_NAMES.get(source, source)
+
+
+def _franchise_color(source: str) -> str:
+    return _FRANCHISE_COLORS.get(source, "⚫")
 
 
 def _format_date_header(d: date) -> str:
@@ -46,7 +63,7 @@ def _render_day_table(entries: list[tuple]) -> str:
         if i > 0:
             lines.append("")
         price_str = f"  {price} ₽" if price else ""
-        lines.append(f"{(event_time or '??:??'):<6}{_franchise_name(source)}{price_str}")
+        lines.append(f"{(event_time or '??:??'):<6}{_franchise_color(source)} {_franchise_name(source)}{price_str}")
         lines.append(f"  {title or '—'} — {venue or 'уточняется'}")
     return "<pre>" + "\n".join(lines) + "</pre>"
 

@@ -1,11 +1,12 @@
 from datetime import date
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
 from ..aggregator import refresh_all
 from ..db import Database
+from ..keyboards import BTN_UPDATE
 
 router = Router(name="admin")
 
@@ -24,6 +25,16 @@ def _is_admin(user_id: int, admin_ids: set[int]) -> bool:
 @router.message(Command("update"))
 async def cmd_update(message: Message, db: Database, admin_ids: set[int]) -> None:
     if not _is_admin(message.from_user.id, admin_ids):
+        return
+    await message.answer("Обновляю расписание из источников…")
+    await refresh_all(db)
+    await message.answer("Готово. /sources — посмотреть статус.")
+
+
+@router.message(F.text == BTN_UPDATE)
+async def btn_update(message: Message, db: Database, admin_ids: set[int]) -> None:
+    if not _is_admin(message.from_user.id, admin_ids):
+        await message.answer("Обновление данных доступно только администраторам.")
         return
     await message.answer("Обновляю расписание из источников…")
     await refresh_all(db)
