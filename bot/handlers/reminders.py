@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message
 
 from ..db import Database
 from ..formatting import format_date_header
-from ..keyboards import game_picker_keyboard
+from ..keyboards import BTN_REMIND_GAMES, BTN_REMIND_OFF, BTN_REMIND_ON, game_picker_keyboard
 
 router = Router(name="reminders")
 
@@ -24,6 +24,20 @@ _HELP = (
 )
 
 
+async def _enable_reminders(db: Database, chat_id: int, hours: int) -> str:
+    hours = max(_MIN_HOURS, min(_MAX_HOURS, hours))
+    await db.set_reminder(chat_id, hours * 60)
+    return (
+        f"🔔 Напоминания включены: за {hours} ч. до начала игры.\n"
+        f"Не забудьте выбрать сами игры через /remind_games — иначе напоминать не о чем."
+    )
+
+
+async def _disable_reminders(db: Database, chat_id: int) -> str:
+    await db.clear_reminder(chat_id)
+    return "🔕 Напоминания выключены. Выбранные игры сохранены — /remind_on включит напоминания снова."
+
+
 @router.message(Command("remind_on"))
 async def cmd_remind_on(message: Message, db: Database) -> None:
     parts = message.text.split(maxsplit=1)
@@ -34,18 +48,22 @@ async def cmd_remind_on(message: Message, db: Database) -> None:
         except ValueError:
             await message.answer(_HELP)
             return
-    hours = max(_MIN_HOURS, min(_MAX_HOURS, hours))
-    await db.set_reminder(message.chat.id, hours * 60)
-    await message.answer(
-        f"🔔 Напоминания включены: за {hours} ч. до начала игры.\n"
-        f"Не забудьте выбрать сами игры через /remind_games — иначе напоминать не о чем."
-    )
+    await message.answer(await _enable_reminders(db, message.chat.id, hours))
 
 
 @router.message(Command("remind_off"))
 async def cmd_remind_off(message: Message, db: Database) -> None:
-    await db.clear_reminder(message.chat.id)
-    await message.answer("🔕 Напоминания выключены. Выбранные игры сохранены — /remind_on включит напоминания снова.")
+    await message.answer(await _disable_reminders(db, message.chat.id))
+
+
+@router.message(F.text == BTN_REMIND_ON)
+async def btn_remind_on(message: Message, db: Database) -> None:
+    await message.answer(await _enable_reminders(db, message.chat.id, _DEFAULT_HOURS))
+
+
+@router.message(F.text == BTN_REMIND_OFF)
+async def btn_remind_off(message: Message, db: Database) -> None:
+    await message.answer(await _disable_reminders(db, message.chat.id))
 
 
 @router.message(Command("remind_status", "remind"))
@@ -74,6 +92,12 @@ async def _render_picker(db: Database, chat_id: int, day_offset: int, lookahead_
 
 @router.message(Command("remind_games"))
 async def cmd_remind_games(message: Message, db: Database, lookahead_days: int) -> None:
+    text, markup = await _render_picker(db, message.chat.id, day_offset=0, lookahead_days=lookahead_days)
+    await message.answer(text, reply_markup=markup)
+
+
+@router.message(F.text == BTN_REMIND_GAMES)
+async def btn_remind_games(message: Message, db: Database, lookahead_days: int) -> None:
     text, markup = await _render_picker(db, message.chat.id, day_offset=0, lookahead_days=lookahead_days)
     await message.answer(text, reply_markup=markup)
 

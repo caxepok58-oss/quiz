@@ -6,6 +6,9 @@ BTN_UPDATE = "🔄 Обновить данные"
 BTN_7_DAYS = "📅 Ближайшие игры на 7 дней"
 BTN_30_DAYS = "🗓 Ближайшие игры на 30 дней"
 BTN_FAVORITES = "⭐ Мои франшизы"
+BTN_REMIND_GAMES = "🔔 Выбрать игры для напоминания"
+BTN_REMIND_ON = "🔔 Включить напоминания"
+BTN_REMIND_OFF = "🔕 Выключить напоминания"
 
 _FAV_PREFIX = "fav:"
 _FAV_CLEAR = "fav:clear"
@@ -16,6 +19,8 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text=BTN_7_DAYS), KeyboardButton(text=BTN_30_DAYS)],
             [KeyboardButton(text=BTN_FAVORITES), KeyboardButton(text=BTN_UPDATE)],
+            [KeyboardButton(text=BTN_REMIND_GAMES)],
+            [KeyboardButton(text=BTN_REMIND_ON), KeyboardButton(text=BTN_REMIND_OFF)],
         ],
         resize_keyboard=True,
     )
