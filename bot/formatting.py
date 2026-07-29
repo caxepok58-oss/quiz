@@ -18,6 +18,7 @@ _MONTHS_GENITIVE = [
 ]
 
 _MAX_MESSAGE_LEN = 3500
+_DAY_SEPARATOR = "――――――――――――――――"
 
 _FRANCHISE_NAMES = {
     "quizplease": "Квиз, плиз!",
@@ -88,7 +89,8 @@ def build_messages(rows, city_name: str, days_ahead: int) -> list[str]:
     messages = []
     current = header
     for block in blocks:
-        candidate = current + block + "\n\n"
+        piece = block if current in (header, "") else f"{_DAY_SEPARATOR}\n\n{block}"
+        candidate = current + piece + "\n\n"
         if len(candidate) > _MAX_MESSAGE_LEN and current != header:
             messages.append(current.rstrip())
             current = block + "\n\n"
