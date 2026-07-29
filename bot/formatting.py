@@ -69,19 +69,22 @@ def _wrap(text: str, width: int) -> list[str]:
     return textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False) or [""]
 
 
+_ROW_WIDTH = _COL_TIME + _COL_FRANCHISE + _COL_TITLE + _COL_VENUE + _COL_PRICE + 4  # + 4 "|" separators
+
+
 def _row(time_col: str, franchise_col: str, title_col: str, venue_col: str, price_col: str) -> str:
     return (
-        f"{time_col:<{_COL_TIME}}"
-        f"{franchise_col:<{_COL_FRANCHISE}}"
-        f"{title_col:<{_COL_TITLE}}"
-        f"{venue_col:<{_COL_VENUE}}"
+        f"{time_col:<{_COL_TIME}}|"
+        f"{franchise_col:<{_COL_FRANCHISE}}|"
+        f"{title_col:<{_COL_TITLE}}|"
+        f"{venue_col:<{_COL_VENUE}}|"
         f"{price_col:<{_COL_PRICE}}"
     )
 
 
 def _render_day_table(entries: list[tuple]) -> str:
-    lines = [_row("Время", "Франшиза", "Игра", "Место проведения", "Стоимость")]
-    lines.append("-" * (_COL_TIME + _COL_FRANCHISE + _COL_TITLE + _COL_VENUE + _COL_PRICE))
+    separator = "_" * _ROW_WIDTH
+    lines = [_row("Время", "Франшиза", "Игра", "Место проведения", "Стоимость"), separator]
     for event_time, title, venue, price, source in entries:
         franchise = f"{_franchise_color(source)} {_franchise_name(source)}"
         price_str = f"{price} ₽" if price else ""
@@ -98,6 +101,7 @@ def _render_day_table(entries: list[tuple]) -> str:
                     price_str if i == 0 else "",
                 )
             )
+        lines.append(separator)
     return "<pre>" + "\n".join(lines) + "</pre>"
 
 
