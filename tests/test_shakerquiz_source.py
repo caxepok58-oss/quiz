@@ -55,7 +55,7 @@ def test_parse_joins_games_with_venue_and_converts_utc_to_moscow():
     event = events[0]
     assert event.title == "МУЗЫКАЛЬНОЕ ЛОТО"
     assert event.event_date == date(2026, 8, 5)
-    assert event.event_time == time(22, 30)  # 19:30 UTC + 3h (Europe/Moscow)
+    assert event.event_time == time(19, 30)  # raw value is already local time
     assert event.venue == 'бар "Высота 175"'
     assert event.address == "ул. Володарского 27"
     assert event.price == "600"

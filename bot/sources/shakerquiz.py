@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 
@@ -15,13 +14,8 @@ from .base import BaseSource
 # the schedule data we need, already scoped to Penza - no separate API
 # call required, just parse that one script tag.
 #
-# `event_time` is ISO-8601 with a "Z" (UTC) suffix. We convert it to
-# Europe/Moscow for display, taking the "Z" at face value; this hasn't
-# been cross-checked against a human-readable time shown elsewhere on the
-# site (there wasn't one in the static HTML). If real games turn out to
-# start at the raw UTC-labelled clock time instead, drop the
-# .astimezone(_MOSCOW) conversion below.
-_MOSCOW = ZoneInfo("Europe/Moscow")
+# `event_time` has a "Z" suffix but the value is already local Moscow time,
+# not UTC. We strip the suffix and treat it as naive local time.
 _GAMES_KEY = "GET/games/search"
 _VENUES_KEY = "GET/games/venue/:venue/search"
 
@@ -61,7 +55,7 @@ class ShakerQuizSource(BaseSource):
             if not raw_time:
                 continue
             try:
-                dt_local = datetime.fromisoformat(raw_time.replace("Z", "+00:00")).astimezone(_MOSCOW)
+                dt_local = datetime.fromisoformat(raw_time.rstrip("Z").split(".")[0])
             except ValueError:
                 continue
 
