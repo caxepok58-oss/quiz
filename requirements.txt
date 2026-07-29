@@ -5,3 +5,4 @@ lxml>=5.0
 APScheduler>=3.10
 python-dotenv>=1.0
 aiosqlite>=0.19
+Pillow>=10.0

@@ -9,6 +9,7 @@ BTN_FAVORITES = "⭐ Мои франшизы"
 BTN_REMIND_GAMES = "🔔 Выбрать игры для напоминания"
 BTN_REMIND_ON = "🔔 Включить напоминания"
 BTN_REMIND_OFF = "🔕 Выключить напоминания"
+BTN_SCHEDULE_IMAGE = "🖼 Полное расписание на 30 дней"
 
 _FAV_PREFIX = "fav:"
 _FAV_CLEAR = "fav:clear"
@@ -21,6 +22,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=BTN_FAVORITES), KeyboardButton(text=BTN_UPDATE)],
             [KeyboardButton(text=BTN_REMIND_GAMES)],
             [KeyboardButton(text=BTN_REMIND_ON), KeyboardButton(text=BTN_REMIND_OFF)],
+            [KeyboardButton(text=BTN_SCHEDULE_IMAGE)],
         ],
         resize_keyboard=True,
     )

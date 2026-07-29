@@ -88,7 +88,7 @@ def _render_day_entries(entries: list[tuple]) -> str:
     return "\n\n".join(cards)
 
 
-def _format_freshness(updated_at: str) -> str:
+def format_freshness(updated_at: str) -> str:
     try:
         updated_dt = datetime.fromisoformat(updated_at)
     except ValueError:
@@ -107,7 +107,7 @@ def build_messages(rows, city_name: str, days_ahead: int, updated_at: str | None
     """rows: iterable of (source, title, venue, address, event_date, event_time, price, url)."""
     if not rows:
         text = f"На ближайшие {days_ahead} дней в г. {city_name} игр не найдено."
-        freshness = _format_freshness(updated_at) if updated_at else ""
+        freshness = format_freshness(updated_at) if updated_at else ""
         return [f"{text}\n\n{freshness}" if freshness else text]
 
     by_date: dict[str, list[tuple]] = {}
@@ -134,7 +134,7 @@ def build_messages(rows, city_name: str, days_ahead: int, updated_at: str | None
     if current.strip():
         messages.append(current.rstrip())
     if updated_at and messages:
-        freshness = _format_freshness(updated_at)
+        freshness = format_freshness(updated_at)
         if freshness:
             messages[-1] = f"{messages[-1]}\n\n{freshness}"
     return messages
