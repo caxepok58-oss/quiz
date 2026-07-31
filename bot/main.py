@@ -11,6 +11,7 @@ from .aggregator import refresh_all
 from .config import load_config
 from .db import Database
 from .handlers import admin, common, favorites, games, reminders
+from .middlewares import UserTrackingMiddleware
 from .scheduler import setup_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -43,6 +44,7 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher()
+    dp.update.outer_middleware(UserTrackingMiddleware(db))
     dp.include_router(common.router)
     dp.include_router(games.router)
     dp.include_router(favorites.router)

@@ -57,6 +57,23 @@ async def cmd_sources(message: Message, db: Database) -> None:
     await message.answer("\n".join(lines))
 
 
+@router.message(Command("stats"))
+async def cmd_stats(message: Message, db: Database, admin_ids: set[int]) -> None:
+    if not _is_admin(message.from_user.id, admin_ids):
+        return
+    s = await db.get_user_stats()
+    await message.answer(
+        "Статистика пользователей:\n"
+        f"Всего: {s['total']}\n"
+        f"Активны за сутки: {s['active_day']}\n"
+        f"Активны за 7 дней: {s['active_week']}\n"
+        f"Активны за 30 дней: {s['active_month']}\n"
+        f"Новых за сутки: {s['new_day']}\n"
+        f"Новых за 7 дней: {s['new_week']}\n"
+        f"Последняя активность: {s['last_seen'] or '—'} UTC"
+    )
+
+
 @router.message(Command("add_game"))
 async def cmd_add_game(message: Message, db: Database, admin_ids: set[int]) -> None:
     if not _is_admin(message.from_user.id, admin_ids):

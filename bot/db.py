@@ -66,6 +66,12 @@ CREATE TABLE IF NOT EXISTS game_reminders (
     event_date TEXT NOT NULL,
     PRIMARY KEY (chat_id, dedup_key)
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    chat_id INTEGER PRIMARY KEY,
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL
+);
 """
 
 # How many consecutive failed refreshes (roughly, days - refresh runs once/day) before
@@ -357,6 +363,41 @@ class Database:
             return None
         title, venue, event_date, event_time = row
         return f"manual-{event_id}", event_date, "manual", title, venue, event_time
+
+    async def touch_user(self, chat_id: int, now: datetime | None = None) -> None:
+        """Record that a chat interacted with the bot. Called on every update."""
+        conn = self._conn
+        stamp = (now or datetime.utcnow()).isoformat()
+        await conn.execute(
+            """INSERT INTO users (chat_id, first_seen, last_seen) VALUES (?, ?, ?)
+               ON CONFLICT(chat_id) DO UPDATE SET last_seen = excluded.last_seen""",
+            (chat_id, stamp, stamp),
+        )
+        await conn.commit()
+
+    async def get_user_stats(self, now: datetime | None = None) -> dict:
+        """User counts for /stats: total, actives per window, newcomers, last activity."""
+        conn = self._conn
+        now = now or datetime.utcnow()
+        day, week, month = (now - timedelta(days=n) for n in (1, 7, 30))
+        cur = await conn.execute(
+            """SELECT COUNT(*),
+                      SUM(last_seen >= ?), SUM(last_seen >= ?), SUM(last_seen >= ?),
+                      SUM(first_seen >= ?), SUM(first_seen >= ?),
+                      MAX(last_seen)
+               FROM users""",
+            (day.isoformat(), week.isoformat(), month.isoformat(), day.isoformat(), week.isoformat()),
+        )
+        total, active_day, active_week, active_month, new_day, new_week, last_seen = await cur.fetchone()
+        return {
+            "total": total,
+            "active_day": active_day or 0,
+            "active_week": active_week or 0,
+            "active_month": active_month or 0,
+            "new_day": new_day or 0,
+            "new_week": new_week or 0,
+            "last_seen": last_seen,
+        }
 
     async def get_game_reminder_keys(self, chat_id: int) -> set[str]:
         conn = self._conn

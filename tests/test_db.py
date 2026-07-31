@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
 import pytest
 import pytest_asyncio
@@ -166,6 +166,44 @@ async def test_toggle_game_reminder(db):
     subscribed = await db.toggle_game_reminder(chat_id, "quizplease|a", "2026-08-05")
     assert subscribed is False
     assert await db.get_game_reminder_keys(chat_id) == set()
+
+
+@pytest.mark.asyncio
+async def test_touch_user_keeps_first_seen_and_advances_last_seen(db):
+    now = datetime(2026, 8, 5, 12, 0)
+    await db.touch_user(42, now=now)
+    await db.touch_user(42, now=now + timedelta(days=3))
+
+    stats = await db.get_user_stats(now=now + timedelta(days=3))
+    assert stats["total"] == 1
+    # Seen 3 days ago for the first time, active just now.
+    assert stats["active_day"] == 1
+    assert stats["new_day"] == 0
+    assert stats["new_week"] == 1
+
+
+@pytest.mark.asyncio
+async def test_get_user_stats_counts_activity_windows(db):
+    now = datetime(2026, 8, 5, 12, 0)
+    await db.touch_user(1, now=now - timedelta(hours=2))
+    await db.touch_user(2, now=now - timedelta(days=3))
+    await db.touch_user(3, now=now - timedelta(days=10))
+    await db.touch_user(4, now=now - timedelta(days=60))
+
+    stats = await db.get_user_stats(now=now)
+    assert stats["total"] == 4
+    assert stats["active_day"] == 1
+    assert stats["active_week"] == 2
+    assert stats["active_month"] == 3
+    assert stats["last_seen"] == (now - timedelta(hours=2)).isoformat()
+
+
+@pytest.mark.asyncio
+async def test_get_user_stats_on_empty_table(db):
+    stats = await db.get_user_stats()
+    assert stats["total"] == 0
+    assert stats["active_week"] == 0
+    assert stats["last_seen"] is None
 
 
 @pytest.mark.asyncio
